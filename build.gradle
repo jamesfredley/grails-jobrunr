@@ -1,0 +1,51 @@
+plugins {
+    id 'org.apache.grails.gradle.grails-web' version "${grailsVersion}"
+    id 'org.apache.grails.gradle.grails-gsp' version "${grailsVersion}"
+}
+
+group = 'example.grails'
+version = '0.1'
+
+repositories {
+    mavenCentral()
+}
+
+configurations.configureEach {
+    resolutionStrategy.force 'org.apache.groovy:groovy-xml:4.0.26'
+    resolutionStrategy.force 'org.yaml:snakeyaml:2.3'
+}
+
+dependencies {
+    // Grails Web Starter (includes core, controllers, GSP, services, etc.)
+    implementation 'org.apache.grails:grails-dependencies-starter-web'
+
+    // GORM for Hibernate 5
+    implementation 'org.apache.grails:grails-data-hibernate5'
+    implementation 'org.apache.grails:grails-data-hibernate5-spring-boot'
+    implementation 'org.apache.grails:grails-datasource'
+
+    // H2 database for development
+    runtimeOnly 'com.h2database:h2'
+
+    // macOS file watcher for hot-reload in development
+    developmentOnly 'io.methvin:directory-watcher:0.18.0'
+
+    // JobRunr for background job processing
+    implementation 'org.jobrunr:jobrunr-spring-boot-3-starter:8.5.1'
+
+    // Testing
+    testImplementation 'org.apache.grails:grails-testing-support-web'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+bootRun {
+    jvmArgs(
+        '-Dspring.output.ansi.enabled=always',
+        '-XX:TieredStopAtLevel=1',
+        '-Dgrails.env=development'
+    )
+    sourceResources sourceSets.main
+}
