@@ -10,16 +10,12 @@ repositories {
     mavenCentral()
 }
 
-configurations.configureEach {
-    resolutionStrategy.force 'org.apache.groovy:groovy-xml:4.0.26'
-    resolutionStrategy.force 'org.yaml:snakeyaml:2.3'
-}
-
 dependencies {
     // Grails Web Starter (includes core, controllers, GSP, services, etc.)
     implementation 'org.apache.grails:grails-dependencies-starter-web'
 
-    // GORM for Hibernate 5
+    // GORM for Hibernate 5 (Grails 8.0.0-M1 still ships Hibernate 5.6.15.Final;
+    // a Hibernate 7 migration is in progress upstream)
     implementation 'org.apache.grails:grails-data-hibernate5'
     implementation 'org.apache.grails:grails-data-hibernate5-spring-boot'
     implementation 'org.apache.grails:grails-datasource'
@@ -28,10 +24,16 @@ dependencies {
     runtimeOnly 'com.h2database:h2'
 
     // macOS file watcher for hot-reload in development
-    developmentOnly 'io.methvin:directory-watcher:0.18.0'
+    developmentOnly 'io.methvin:directory-watcher:0.19.1'
 
-    // JobRunr for background job processing
-    implementation 'org.jobrunr:jobrunr-spring-boot-3-starter:8.5.1'
+    // JobRunr for background job processing.
+    // Grails 8.0.0-M1 ships Spring Boot 4 / Spring Framework 7, so use the SB4 starter.
+    // (For Grails 7.x, use jobrunr-spring-boot-3-starter at the same version.)
+    implementation 'org.jobrunr:jobrunr-spring-boot-4-starter:8.5.1'
+
+    // Spring Boot 4 / Grails 8 no longer pulls jackson-databind transitively for our
+    // surface area. JobRunr's JacksonJsonMapper needs it explicitly.
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 
     // Testing
     testImplementation 'org.apache.grails:grails-testing-support-web'
