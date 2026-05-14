@@ -1,13 +1,15 @@
 # Using JobRunr with Grails
 
-This guide walks you through integrating [JobRunr](https://www.jobrunr.io/) — a distributed background job processing library — with [Apache Grails](https://grails.org/) 7. By the end you will have a working demo app that showcases every major JobRunr OSS feature: fire-and-forget jobs, scheduled jobs, recurring jobs, retries, progress tracking, job filters, and the built-in dashboard.
+This guide walks you through integrating [JobRunr](https://www.jobrunr.io/) - a distributed background job processing library - with [Apache Grails](https://grails.org/) 8. By the end you will have a working demo app that showcases every major JobRunr OSS feature: fire-and-forget jobs, scheduled jobs, recurring jobs, retries, progress tracking, job filters, and the built-in dashboard.
 
 The demo uses an e-commerce order processing theme with domain classes for orders, products, and audit logs.
 
 ## Prerequisites
 
-- Java 17 or later
-- No Grails CLI required — the project includes the Gradle wrapper
+- **Java 21 or later** (Grails 8 minimum)
+- No Grails CLI required - the project includes the Gradle wrapper
+
+> **For Grails 7.1.0**: pin `grailsVersion=7.1.0` in `gradle.properties` and swap `jobrunr-spring-boot-4-starter` for `jobrunr-spring-boot-3-starter` (same version). The rest of the demo works unchanged on JDK 17+.
 
 ## Quick Start
 
@@ -65,21 +67,23 @@ dependencies {
     // macOS file watcher (prevents noisy ClassNotFoundException on startup)
     developmentOnly 'io.methvin:directory-watcher:0.18.0'
 
-    // JobRunr
-    implementation 'org.jobrunr:jobrunr-spring-boot-3-starter:8.5.1'
+    // JobRunr (Grails 8 ships Spring Boot 4, so use the SB4 starter;
+    // on Grails 7.x replace with jobrunr-spring-boot-3-starter at the same version)
+    implementation 'org.jobrunr:jobrunr-spring-boot-4-starter:8.5.1'
 }
 ```
 
 > **Pitfall: Two Hibernate artifacts.** `grails-data-hibernate5` registers the Grails Hibernate plugin. `grails-data-hibernate5-spring-boot` provides the Spring Boot auto-configuration. If you only include the `-spring-boot` one, GORM will not initialize and you'll get: _"Either class [X] is not a domain class or GORM has not been initialized correctly."_
 
+> **Pitfall: JobRunr starter must match Spring Boot major version.** The `jobrunr-spring-boot-3-starter` is compiled against Spring Boot 3 / Spring Framework 6 APIs (declared `provided` scope). Putting it on a Grails 8 (Spring Boot 4 / Spring Framework 7) classpath will fail at bean wiring or class load time. Use the matching starter for your Spring Boot major version.
+
 > **Pitfall: macOS file watcher.** Without `io.methvin:directory-watcher`, startup logs a long `NoClassDefFoundError` stacktrace for `MacOSXListeningWatchService`. It's harmless but noisy.
 
 ### Application Class
 
-Your `Application.groovy` needs three annotations beyond the default:
+Your `Application.groovy` needs two annotations beyond the default:
 
 ```groovy
-@CompileStatic
 @Import([JobRunrStorageConfig, HibernateGormAutoConfiguration])
 @ComponentScan('example.grails.jobrunr')
 class Application extends GrailsAutoConfiguration {
@@ -89,15 +93,19 @@ class Application extends GrailsAutoConfiguration {
 }
 ```
 
-- `@Import(JobRunrStorageConfig)` — loads the custom StorageProvider bean (see next section)
-- `@Import(HibernateGormAutoConfiguration)` — Grails bypasses Spring Boot's `DataSourceAutoConfiguration`, which GORM's Hibernate auto-config depends on. Without this explicit import, GORM won't initialize.
-- `@ComponentScan('example.grails.jobrunr')` — ensures Spring discovers `@Component` classes in `src/main/groovy/`. Grails does not component-scan that directory by default.
+- `@Import(JobRunrStorageConfig)` - loads the custom StorageProvider bean (see next section)
+- `@Import(HibernateGormAutoConfiguration)` - Grails bypasses Spring Boot's `DataSourceAutoConfiguration`, which GORM's Hibernate auto-config depends on. Without this explicit import, GORM won't initialize.
+- `@ComponentScan('example.grails.jobrunr')` - ensures Spring discovers `@Component` classes in `src/main/groovy/`. Grails does not component-scan that directory by default.
+
+> **Do not put `@CompileStatic` on `Application.groovy`.** `GrailsAutoConfiguration`'s lifecycle hooks (`doWithSpring`, `doWithApplicationContext`, `doWithDynamicMethods`, ...) dispatch into Groovy closures. Static compilation breaks those hooks the moment you override one.
 
 ---
 
 ## 2. Bridging Grails and JobRunr
 
-Grails manages its DataSource through the GORM DataSource plugin, not through Spring Boot's standard `DataSourceAutoConfiguration`. JobRunr's auto-configuration can't find it, so you must create the `StorageProvider` bean explicitly.
+Grails configures its DataSource via `dataSource:` blocks in `application.yml` (not the `spring.datasource.*` keys Spring Boot's `DataSourceAutoConfiguration` looks for), and the bean is registered late, by `HibernateGormAutoConfiguration` calling `beanFactory.registerSingleton('dataSource', datastore.getDataSource())` from inside its `@Bean` method.
+
+JobRunr's `JobRunrSqlStorageAutoConfiguration` is annotated `@AutoConfigureAfter(DataSourceAutoConfiguration.class)` and `@ConditionalOnBean(DataSource.class)`. Because Spring Boot's `DataSourceAutoConfiguration` finds no `spring.datasource.*` config and contributes nothing, JobRunr's storage auto-config evaluates its `@ConditionalOnBean` against a context where the GORM-managed DataSource has not been registered yet. The result varies by Spring Boot version and bean ordering: in this demo it is unreliable enough that we register the `StorageProvider` explicitly to remove the timing dependency.
 
 There are three things this configuration class must handle:
 
@@ -205,7 +213,7 @@ There is no workaround — Groovy closures fundamentally cannot be used with `Jo
 
 ### The solution
 
-Use JobRunr's **JobRequest pattern** instead. It avoids lambdas entirely and is the recommended approach for all non-Java JVM languages (Groovy, Kotlin, Scala).
+Use JobRunr's **JobRequest pattern** instead. It avoids lambdas entirely. (Kotlin users have a separate code path - JobRunr ships a `KotlinJobDetailsFinder` for Kotlin lambdas - so this section is specific to Groovy.)
 
 Instead of `JobScheduler`, inject `JobRequestScheduler`:
 
@@ -369,11 +377,13 @@ void run(OrderJobRequest request) { /* ... */ }
 
 ## 10. Job Progress and Dashboard Logging
 
-Access the `JobContext` via `jobContext()` inside a `JobRequestHandler.run()` method:
+Access the `JobContext` via `ThreadLocalJobContext.getJobContext()` inside a `JobRequestHandler.run()` method:
 
 ```groovy
+import org.jobrunr.server.runner.ThreadLocalJobContext
+
 void run(ImportProductsJobRequest request) throws Exception {
-    JobContext context = jobContext()
+    JobContext context = ThreadLocalJobContext.jobContext
     JobDashboardLogger jobLogger = context.logger()
     JobDashboardProgressBar progressBar = context.progressBar(request.batchSize)
 
@@ -382,13 +392,15 @@ void run(ImportProductsJobRequest request) throws Exception {
 }
 ```
 
+> **Pitfall: `JobRequestHandler.jobContext()` is `@Deprecated` in 8.x.** The default method still works (it delegates to `ThreadLocalJobContext.getJobContext()`), but the official replacement is `ThreadLocalJobContext.getJobContext()` called directly. See [`JobRequestHandler.java`](https://github.com/jobrunr/jobrunr/blob/v8.5.1/core/src/main/java/org/jobrunr/jobs/lambdas/JobRequestHandler.java).
+
 > **Pitfall: JobRunr 8.x API changes.** Three things changed from earlier versions:
 >
-> 1. **Get logger/progressBar from context** — Use `context.logger()` and `context.progressBar(n)`. Do NOT call `new JobDashboardLogger(context)` — the constructor now takes a `Job` object, not a `JobContext`, and Groovy's constructor resolution will fail with `MissingMethodException`.
+> 1. **Get logger/progressBar from context** - Use `context.logger()` and `context.progressBar(n)`. Do NOT call `new JobDashboardLogger(context)` - the constructor now takes a `Job` object, not a `JobContext`, and Groovy's constructor resolution will fail with `MissingMethodException`.
 >
-> 2. **`incrementSucceeded()` not `increaseByOne()`** — The progress bar method was renamed in 8.x.
+> 2. **`incrementSucceeded()` not `increaseByOne()`** - The progress bar method was renamed in 8.x.
 >
-> 3. **`info(String)` only** — `JobDashboardLogger.info()` takes a single `String`. It does NOT support SLF4J-style `info("text {}", arg)` formatting. Use Groovy string interpolation: `jobLogger.info("Processing ${product.name}")`.
+> 3. **`info(String)` only** - `JobDashboardLogger.info()` takes a single `String`. It does NOT support SLF4J-style `info("text {}", arg)` formatting. Use Groovy string interpolation: `jobLogger.info("Processing ${product.name}")`.
 
 ---
 
@@ -436,7 +448,7 @@ class AuditJobFilter implements ApplyStateFilter {
 
 > **Pitfall: Filters must be registered manually in JobRunr 8.x.** The auto-configuration does not inject `JobFilter` beans into the `BackgroundJobServer`. See the `JobFilterRegistrar` in [Section 2](#2-bridging-grails-and-jobrunr).
 
-> **Pitfall: GORM in filters trips JobRunr's 10ms soft budget.** A `withNewTransaction` block that writes a domain object typically takes 10 to 20 ms, and JobRunr will log a warning every time the filter fires: _"JobFilter ... has slow performance of 13ms (a Job Filter should run under 10ms) which negatively impacts the overall functioning of JobRunr."_ Keep filter work minimal, or push the heavy work into a fire-and-forget child job. JobRunr Pro offers async filters that bypass this constraint; OSS users have to live with the warning or accept the throughput impact.
+> **Pitfall: GORM in filters trips JobRunr's 10 ms warning.** A `withNewTransaction` block that writes a domain object typically takes 10 to 60 ms on first invocation. JobRunr OSS does emit a warning every time the filter exceeds the budget - observed verbatim during boot of this demo on Grails 8: _"JobFilter of type 'example.grails.jobrunr.AuditJobFilter' has slow performance of 57ms (a Job Filter should run under 10ms) which negatively impacts the overall functioning of JobRunr. JobRunr Pro can run slow running Job Filters without a negative performance impact."_ Keep filter work minimal, push heavy work into a fire-and-forget child job, or accept the warning for low-throughput audit use cases.
 
 ---
 
@@ -508,13 +520,40 @@ environments:
 
 JobRunr supports PostgreSQL, MySQL/MariaDB, Oracle, SQL Server, and MongoDB.
 
-### Disable the Dashboard
+### Secure (or Disable) the Dashboard
+
+The dashboard is **unauthenticated by default** and binds to all interfaces on port 8000. The single most common JobRunr production footgun is leaving it exposed. Either disable it:
 
 ```yaml
 jobrunr:
     dashboard:
         enabled: false
 ```
+
+Or enable HTTP Basic Auth:
+
+```yaml
+jobrunr:
+    dashboard:
+        enabled: true
+        port: 8000
+        username: ${JOBRUNR_DASHBOARD_USER}
+        password: ${JOBRUNR_DASHBOARD_PASSWORD}
+```
+
+A reverse proxy (nginx, Caddy, an ingress controller) doing TLS termination + auth in front of port 8000 is the more robust pattern.
+
+### CSRF Protection
+
+The demo's GSP forms do not enable CSRF tokens because the demo has no Spring Security on the classpath. Production apps should add the [Spring Security Core plugin](https://plugins.grails.org/plugin/grails/spring-security-core) and use Spring Security's CSRF integration with `<g:form>`, or fall back to the legacy `<g:form useToken="true">` + `withForm` controller pattern.
+
+### Static Compilation
+
+Prefer `@GrailsCompileStatic` over plain `@CompileStatic` for Grails artefacts (controllers and services) - it understands Grails-specific dynamic methods (`params`, `flash`, `redirect`, `respond`, GORM dynamic finders) that plain static compilation rejects.
+
+This demo applies `@GrailsCompileStatic` to controllers and to the simpler services. Two services that use heavy GORM DSLs (`createCriteria { projections { ... } }` in `ReportGenerationService`, `where { ... }.deleteAll()` in `DataCleanupService`) are left without it - those DSLs do not survive static compilation. Verify in your build before adding the annotation; do not assume it is safe.
+
+Avoid static compilation on **domain classes**: GORM injects `save()`, `get()`, finders, `withTransaction`, and so on at runtime via AST transforms, and the trade-offs are not worth the friction.
 
 ---
 
@@ -534,9 +573,14 @@ A quick-reference of every Grails-specific pitfall covered in this guide:
 | Domain class named `Order` | DDL error on `DROP TABLE order` | Add `static mapping = { table 'customer_order' }` |
 | `@Recurring` not discovered | No recurring jobs in dashboard | Set `static lazyInit = false` on the service |
 | `@Job(name = "...%0")` on `run()` method | Job name shows request object's `toString()` | Use a fixed name without `%0` on `run()` methods |
-| `new JobDashboardLogger(context)` | `MissingMethodException` — constructor takes `Job` not `JobContext` | Use `context.logger()` instead |
+| `JobRequestHandler.jobContext()` | `@Deprecated` in 8.x | Use `ThreadLocalJobContext.getJobContext()` |
+| `new JobDashboardLogger(context)` | `MissingMethodException` - constructor takes `Job` not `JobContext` | Use `context.logger()` instead |
 | `progressBar.increaseByOne()` | `MissingMethodException` | Renamed to `progressBar.incrementSucceeded()` in 8.x |
-| `jobLogger.info("text {}", arg)` | `MissingMethodException` — only `info(String)` exists | Use Groovy interpolation: `jobLogger.info("text ${arg}")` |
+| `jobLogger.info("text {}", arg)` | `MissingMethodException` - only `info(String)` exists | Use Groovy interpolation: `jobLogger.info("text ${arg}")` |
 | `withNewSession` in job filters | `no transaction is in progress` | Use `withNewTransaction` instead |
 | Job filters silently ignored | Filter bean exists but `onStateApplied` never called | Register filters on `BackgroundJobServer` via `setJobFilters()` |
-| GORM writes inside a filter | `JobFilter ... has slow performance of 13ms` warning every fire | Keep filter work minimal, or offload heavy work to a child job (Pro has async filters) |
+| GORM writes inside a filter | OSS warns: "has slow performance of N ms (a Job Filter should run under 10ms)" | Keep filter work minimal, or offload heavy work to a child job (Pro has async filters) |
+| `@CompileStatic` on a domain class | GORM dynamic methods (`save`, `get`, finders) fail to compile | Use `@GrailsCompileStatic` on services/controllers instead; never on domains |
+| Missing `static allowedMethods` on a controller with state-changing actions | `GET /controller/save` mutates data | Declare `static allowedMethods = [save: 'POST', ...]` |
+| `Order.list(max: 1).first()` on an empty table | `NoSuchElementException` from `List.first()` | Use `Order.first()` (GORM dynamic finder, returns null) |
+| Dashboard exposed on port 8000 with no auth | Anyone on the network can trigger jobs | Set `jobrunr.dashboard.username` / `password`, or front it with a reverse proxy |
