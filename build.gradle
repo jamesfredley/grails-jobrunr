@@ -7,6 +7,16 @@ plugins {
 group = 'example.grails'
 version = '0.1'
 
+// Pin the JDK at the build level. Grails 8's floor is JDK 21, but this demo
+// targets JDK 25 (current LTS) to exercise the latest Loom + GC improvements.
+// Gradle will auto-provision a Corretto JDK 25 if one is not already installed.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+        vendor = JvmVendorSpec.AMAZON
+    }
+}
+
 repositories {
     mavenCentral()
 }

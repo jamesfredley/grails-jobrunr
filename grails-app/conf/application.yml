@@ -64,9 +64,10 @@ spring:
         template:
             check-template-location: false
     threads:
-        # Tomcat + @Async + framework executors run on JDK 21+ virtual threads (Project Loom).
-        # JobRunr's BackgroundJobServer detects virtual-thread support automatically and
-        # picks `VirtualThreadPerTask` independently of this flag.
+        # Tomcat + @Async + framework executors run on virtual threads (Project Loom).
+        # The build's Gradle toolchain pins JDK 25, so Loom is always available.
+        # JobRunr's BackgroundJobServer detects virtual-thread support automatically
+        # and picks `VirtualThreadPerTask` independently of this flag.
         virtual:
             enabled: true
 

@@ -6,10 +6,10 @@ The demo uses an e-commerce order processing theme with domain classes for order
 
 ## Prerequisites
 
-- **Java 21 or later** (Grails 8 minimum)
+- **Java 25** (the demo's Gradle toolchain pins JDK 25 - Gradle will auto-provision Corretto 25 if you don't already have it installed)
 - No Grails CLI required - the project includes the Gradle wrapper
 
-> **For Grails 7.1.0**: pin `grailsVersion=7.1.0` in `gradle.properties` and swap `jobrunr-spring-boot-4-starter` for `jobrunr-spring-boot-3-starter` (same version). The rest of the demo works unchanged on JDK 17+.
+> **For Grails 7.1.0**: pin `grailsVersion=7.1.0` in `gradle.properties`, swap `jobrunr-spring-boot-4-starter` for `jobrunr-spring-boot-3-starter` (same version), and lower the toolchain to JDK 17. The rest of the demo works unchanged.
 
 ## Quick Start
 
