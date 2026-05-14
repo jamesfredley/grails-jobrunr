@@ -63,6 +63,12 @@ spring:
     groovy:
         template:
             check-template-location: false
+    threads:
+        # Tomcat + @Async + framework executors run on JDK 21+ virtual threads (Project Loom).
+        # JobRunr's BackgroundJobServer detects virtual-thread support automatically and
+        # picks `VirtualThreadPerTask` independently of this flag.
+        virtual:
+            enabled: true
 
 management:
     endpoints:
