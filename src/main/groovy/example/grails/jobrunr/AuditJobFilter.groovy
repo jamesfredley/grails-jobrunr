@@ -9,7 +9,12 @@ import org.springframework.stereotype.Component
 
 /**
  * Custom job filter that logs state transitions to the AuditLog domain class.
- * Registered as a Spring bean — JobRunr's Spring Boot starter auto-discovers it.
+ *
+ * Registered as a Spring @Component, but JobRunr's Spring Boot 3 starter does NOT
+ * auto-discover JobFilter beans - the BackgroundJobServer is wired only with the
+ * built-in RetryFilter. Custom filters are pushed onto the BackgroundJobServer by
+ * JobRunrStorageConfig.JobFilterRegistrar, which runs after the BackgroundJobServer
+ * bean is constructed.
  */
 @Slf4j
 @Component

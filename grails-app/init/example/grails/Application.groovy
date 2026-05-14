@@ -3,12 +3,13 @@ package example.grails
 import example.grails.jobrunr.JobRunrStorageConfig
 import grails.boot.GrailsApp
 import grails.boot.config.GrailsAutoConfiguration
-import groovy.transform.CompileStatic
 import org.grails.datastore.gorm.boot.autoconfigure.HibernateGormAutoConfiguration
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Import
 
-@CompileStatic
+// NOTE: do not add @CompileStatic here. GrailsAutoConfiguration's lifecycle hooks
+// (doWithSpring, doWithApplicationContext, doWithDynamicMethods, ...) rely on
+// dynamic dispatch into Groovy closures and break under static compilation.
 @Import([JobRunrStorageConfig, HibernateGormAutoConfiguration])
 @ComponentScan('example.grails.jobrunr')
 class Application extends GrailsAutoConfiguration {
