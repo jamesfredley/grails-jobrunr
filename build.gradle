@@ -35,6 +35,7 @@ dependencies {
 
     // Testing
     testImplementation 'org.apache.grails:grails-testing-support-web'
+    testImplementation 'org.apache.grails:grails-testing-support-datamapping'
 }
 
 tasks.named('test') {
