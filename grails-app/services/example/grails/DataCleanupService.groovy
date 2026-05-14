@@ -26,6 +26,10 @@ class DataCleanupService implements JobRequestHandler<CleanupJobRequest> {
         switch (request.type) {
             case 'audit-logs':       cleanupOldAuditLogs(); break
             case 'cancelled-orders': cleanupCancelledOrders(); break
+            default:
+                // Surface unknown types as a job failure rather than silently succeeding -
+                // otherwise typos and new types are invisible in the JobRunr dashboard.
+                throw new IllegalArgumentException("Unknown cleanup type: ${request.type}")
         }
     }
 

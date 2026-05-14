@@ -7,11 +7,13 @@ import groovy.util.logging.Slf4j
 import org.jobrunr.jobs.annotations.Job
 import org.jobrunr.jobs.lambdas.JobRequestHandler
 
-import java.util.concurrent.ThreadLocalRandom
-
 /**
  * Demonstrates fire-and-forget jobs with @Job annotation for naming, retries, and labels.
  * Implements JobRequestHandler so it can be invoked via the JobRequest pattern from Groovy.
+ *
+ * The retry-failure demo (which intentionally throws to exercise JobRunr's retry path)
+ * lives in {@code RetryDemoOrderJobRequestHandler} so this service stays free of
+ * demo-only branches.
  */
 @Slf4j
 @GrailsCompileStatic
@@ -21,11 +23,7 @@ class OrderProcessingService implements JobRequestHandler<OrderJobRequest> {
     @Override
     @Job(name = 'Process order', retries = 5, labels = ['order-processing'])
     void run(OrderJobRequest request) throws Exception {
-        if (request.simulateFailure) {
-            processOrderWithPossibleFailure(request.orderId)
-        } else {
-            processOrder(request.orderId)
-        }
+        processOrder(request.orderId)
     }
 
     void processOrder(Long orderId) {
@@ -46,26 +44,5 @@ class OrderProcessingService implements JobRequestHandler<OrderJobRequest> {
         order.status = 'SHIPPED'
         order.save(flush: true)
         log.info('Order #{} has been shipped', orderId)
-    }
-
-    void processOrderWithPossibleFailure(Long orderId) {
-        log.info('Processing order #{} (failure demo)', orderId)
-
-        Order order = Order.get(orderId)
-        if (!order) {
-            throw new IllegalArgumentException("Order not found: ${orderId}")
-        }
-
-        // Randomly fail to demonstrate retry behavior
-        if (ThreadLocalRandom.current().nextInt(3) == 0) {
-            order.status = 'PROCESSING'
-            order.save(flush: true)
-            sleep(1000)
-            order.status = 'SHIPPED'
-            order.save(flush: true)
-            log.info('Order #{} processed successfully', orderId)
-        } else {
-            throw new RuntimeException("Simulated processing failure for order #${orderId} - JobRunr will retry this automatically")
-        }
     }
 }

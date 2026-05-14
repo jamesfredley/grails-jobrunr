@@ -13,6 +13,7 @@
     <logger name="org.apache.grails" level="INFO" />
     <logger name="org.springframework" level="WARN" />
     <logger name="org.hibernate" level="WARN" />
+    <logger name="org.hibernate.orm.deprecation" level="OFF"/> <!--HHH90000022: Hibernate's legacy org.hibernate.Criteria API is deprecated-->
     <logger name="org.jobrunr" level="INFO" />
     <logger name="example.grails" level="DEBUG" />
 </configuration>

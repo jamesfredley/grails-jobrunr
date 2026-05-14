@@ -1,6 +1,8 @@
 package example.grails
 
 import example.grails.jobrunr.CleanupJobRequest
+import example.grails.jobrunr.OrderJobRequest
+import example.grails.jobrunr.RetryDemoOrderJobRequest
 import grails.testing.gorm.DataTest
 import grails.testing.web.controllers.ControllerUnitTest
 import org.jobrunr.scheduling.JobRequestScheduler
@@ -87,5 +89,37 @@ class JobDemoControllerSpec extends Specification
         then:
         0 * jobRequestScheduler.enqueue(_)
         flash.message?.startsWith('No pending orders found')
+    }
+
+    void "fireAndForget enqueues an OrderJobRequest for the first PENDING order"() {
+        given:
+        request.method = 'POST'
+        Order pending = new Order(orderNumber: 'ORD-PEND', customerEmail: 'pending@example.com',
+                                  totalAmount: 5.00G, status: 'PENDING').save(failOnError: true)
+
+        when:
+        controller.fireAndForget()
+
+        then:
+        1 * jobRequestScheduler.enqueue({ OrderJobRequest req ->
+            req.orderId == pending.id
+        })
+        flash.message?.contains("Process Order #${pending.id}")
+    }
+
+    void "fireAndForgetWithRetry enqueues a RetryDemoOrderJobRequest (no simulateFailure flag leaks into OrderJobRequest)"() {
+        given:
+        request.method = 'POST'
+        Order pending = new Order(orderNumber: 'ORD-RETRY', customerEmail: 'retry@example.com',
+                                  totalAmount: 5.00G, status: 'PENDING').save(failOnError: true)
+
+        when:
+        controller.fireAndForgetWithRetry()
+
+        then:
+        1 * jobRequestScheduler.enqueue({ RetryDemoOrderJobRequest req ->
+            req.orderId == pending.id
+        })
+        flash.message?.contains('Retry demo job enqueued')
     }
 }

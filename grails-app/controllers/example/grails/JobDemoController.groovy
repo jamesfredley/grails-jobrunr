@@ -3,6 +3,7 @@ package example.grails
 import example.grails.jobrunr.CleanupJobRequest
 import example.grails.jobrunr.ImportProductsJobRequest
 import example.grails.jobrunr.OrderJobRequest
+import example.grails.jobrunr.RetryDemoOrderJobRequest
 import example.grails.jobrunr.SendConfirmationRequest
 import example.grails.jobrunr.SyncProductRequest
 import grails.compiler.GrailsCompileStatic
@@ -59,7 +60,7 @@ class JobDemoController {
             return
         }
 
-        jobRequestScheduler.enqueue(new OrderJobRequest(order.id, true))
+        jobRequestScheduler.enqueue(new RetryDemoOrderJobRequest(order.id))
 
         flash.message = "Retry demo job enqueued for Order #${order.id}. This job randomly fails - watch retries in the dashboard!"
         redirect(action: 'index')
