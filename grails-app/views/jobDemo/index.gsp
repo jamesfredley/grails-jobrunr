@@ -3,36 +3,6 @@
 <head>
     <meta name="layout" content="main"/>
     <title>Grails + JobRunr Demo</title>
-    <style>
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .card h2 { font-size: 1.1em; margin-bottom: 8px; color: #2c3e50; }
-        .card p { font-size: 0.9em; color: #666; margin-bottom: 15px; }
-        .card .feature-tag { display: inline-block; background: #eee; color: #555; font-size: 0.75em; padding: 2px 8px; border-radius: 3px; margin-bottom: 10px; }
-        .btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 0.9em; text-decoration: none; }
-        .btn-blue { background: #3498db; }
-        .btn-blue:hover { background: #2980b9; }
-        .btn-green { background: #27ae60; }
-        .btn-green:hover { background: #219a52; }
-        .btn-orange { background: #e67e22; }
-        .btn-orange:hover { background: #d35400; }
-        .btn-purple { background: #8e44ad; }
-        .btn-purple:hover { background: #7d3c98; }
-        .btn-red { background: #e74c3c; }
-        .btn-red:hover { background: #c0392b; }
-        .btn-teal { background: #16a085; }
-        .btn-teal:hover { background: #1abc9c; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
-        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; font-weight: 600; }
-        .status { padding: 2px 8px; border-radius: 3px; font-size: 0.8em; font-weight: 600; }
-        .status-PENDING { background: #fff3cd; color: #856404; }
-        .status-PROCESSING { background: #cce5ff; color: #004085; }
-        .status-SHIPPED { background: #d4edda; color: #155724; }
-        .status-DELIVERED { background: #d1ecf1; color: #0c5460; }
-        .status-CANCELLED { background: #f8d7da; color: #721c24; }
-        h2.section-title { margin: 30px 0 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
-    </style>
 </head>
 <body>
     <h2 class="section-title">Trigger Background Jobs</h2>
@@ -126,7 +96,7 @@
                         <td>${product.name}</td>
                         <td>${product.sku}</td>
                         <td>\$${product.price}</td>
-                        <td style="${product.stockQuantity < 10 ? 'color: red; font-weight: bold;' : ''}">${product.stockQuantity}</td>
+                        <td class="${product.stockQuantity < 10 ? 'low-stock' : ''}">${product.stockQuantity}</td>
                     </tr>
                 </g:each>
             </tbody>
@@ -135,7 +105,7 @@
 
     <h2 class="section-title">Recent Audit Logs (Job Filter)</h2>
     <div class="card">
-        <p style="color: #666; font-size: 0.85em; margin-bottom: 10px;">
+        <p class="audit-explainer">
             These entries are created by <code>AuditJobFilter</code> (a custom <code>ApplyStateFilter</code>) whenever a job changes state.
         </p>
         <table>
@@ -145,7 +115,7 @@
             <tbody>
                 <g:each in="${auditLogs}" var="entry">
                     <tr>
-                        <td style="font-family: monospace; font-size: 0.8em;">${entry.jobId?.take(12)}...</td>
+                        <td class="job-id">${entry.jobId?.take(12)}...</td>
                         <td>${entry.jobName}</td>
                         <td>${entry.oldState}</td>
                         <td>${entry.newState}</td>
@@ -153,29 +123,29 @@
                     </tr>
                 </g:each>
                 <g:if test="${!auditLogs}">
-                    <tr><td colspan="5" style="text-align:center; color:#999;">No audit logs yet. Trigger a job to see filter activity.</td></tr>
+                    <tr><td colspan="5" class="empty-state">No audit logs yet. Trigger a job to see filter activity.</td></tr>
                 </g:if>
             </tbody>
         </table>
     </div>
 
-    <div style="margin-top: 30px; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="font-size: 1em; margin-bottom: 10px;">Recurring Jobs (annotation-based)</h2>
-        <p style="font-size: 0.85em; color: #666;">
+    <div class="recurring-jobs-panel">
+        <h2>Recurring Jobs (annotation-based)</h2>
+        <p>
             The following recurring jobs are registered via <code>@Recurring</code> annotations on <code>ReportGenerationService</code>:
         </p>
-        <ul style="font-size: 0.85em; color: #555; margin: 10px 0 10px 20px;">
+        <ul>
             <li><strong>daily-sales-report</strong> &mdash; CRON: <code>0 2 * * *</code> (daily at 2 AM)</li>
             <li><strong>inventory-snapshot</strong> &mdash; Interval: <code>PT6H</code> (every 6 hours)</li>
         </ul>
-        <p style="font-size: 0.85em; color: #666;">
+        <p>
             Plus two programmatic recurring jobs from <code>BootStrap.groovy</code>:
         </p>
-        <ul style="font-size: 0.85em; color: #555; margin: 10px 0 10px 20px;">
+        <ul>
             <li><strong>nightly-audit-cleanup</strong> &mdash; CRON: <code>0 3 * * *</code> (daily at 3 AM)</li>
             <li><strong>weekly-order-cleanup</strong> &mdash; CRON: <code>0 4 * * SUN</code> (Sundays at 4 AM)</li>
         </ul>
-        <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+        <p>
             View all recurring jobs in the <a href="http://localhost:8000" target="_blank">JobRunr Dashboard</a> under the "Recurring Jobs" tab.
         </p>
     </div>

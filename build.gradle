@@ -1,6 +1,7 @@
 plugins {
     id 'org.apache.grails.gradle.grails-web' version "${grailsVersion}"
     id 'org.apache.grails.gradle.grails-gsp' version "${grailsVersion}"
+    id 'cloud.wondrify.asset-pipeline' version "${assetPipelineVersion}"
 }
 
 group = 'example.grails'
@@ -23,16 +24,20 @@ dependencies {
     // H2 database for development
     runtimeOnly 'com.h2database:h2'
 
+    // Asset pipeline for serving CSS/JS from grails-app/assets/
+    runtimeOnly "cloud.wondrify:asset-pipeline-grails:${assetPipelineVersion}"
+
     // macOS file watcher for hot-reload in development
-    developmentOnly 'io.methvin:directory-watcher:0.19.1'
+    developmentOnly "io.methvin:directory-watcher:${directoryWatcherVersion}"
 
     // JobRunr for background job processing.
     // Grails 8.0.0-M1 ships Spring Boot 4 / Spring Framework 7, so use the SB4 starter.
     // (For Grails 7.x, use jobrunr-spring-boot-3-starter at the same version.)
-    implementation 'org.jobrunr:jobrunr-spring-boot-4-starter:8.5.1'
+    implementation "org.jobrunr:jobrunr-spring-boot-4-starter:${jobrunrVersion}"
 
     // Spring Boot 4 / Grails 8 no longer pulls jackson-databind transitively for our
-    // surface area. JobRunr's JacksonJsonMapper needs it explicitly.
+    // surface area. JobRunr's JacksonJsonMapper needs it explicitly. Version comes from
+    // the Spring Boot 4 BOM imported by the Grails 8 BOM.
     implementation 'com.fasterxml.jackson.core:jackson-databind'
 
     // Testing

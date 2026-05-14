@@ -49,14 +49,23 @@ cd grails-jobrunr
 
 ### Dependencies
 
-Add these to `build.gradle`:
+All third-party versions live in `gradle.properties` so the demo has a single source of truth:
+
+```properties
+grailsVersion=8.0.0-M1
+jobrunrVersion=8.5.1
+assetPipelineVersion=5.1.0-M4
+directoryWatcherVersion=0.19.1
+```
+
+Then `build.gradle` references them by name:
 
 ```groovy
 dependencies {
     // Grails Web Starter
     implementation 'org.apache.grails:grails-dependencies-starter-web'
 
-    // GORM Hibernate — you need BOTH artifacts
+    // GORM Hibernate - you need BOTH artifacts
     implementation 'org.apache.grails:grails-data-hibernate5'           // Grails plugin
     implementation 'org.apache.grails:grails-data-hibernate5-spring-boot' // Spring Boot auto-config
     implementation 'org.apache.grails:grails-datasource'
@@ -64,12 +73,20 @@ dependencies {
     // H2 for development
     runtimeOnly 'com.h2database:h2'
 
-    // macOS file watcher (prevents noisy ClassNotFoundException on startup)
-    developmentOnly 'io.methvin:directory-watcher:0.18.0'
+    // Asset pipeline (serves CSS/JS from grails-app/assets/)
+    runtimeOnly "cloud.wondrify:asset-pipeline-grails:${assetPipelineVersion}"
+
+    // macOS file watcher (prevents noisy ClassNotFoundException on startup).
+    // Pin matches the Grails 8.0.0-M1 BOM. On Grails 7.x, use 0.18.0 instead.
+    developmentOnly "io.methvin:directory-watcher:${directoryWatcherVersion}"
 
     // JobRunr (Grails 8 ships Spring Boot 4, so use the SB4 starter;
     // on Grails 7.x replace with jobrunr-spring-boot-3-starter at the same version)
-    implementation 'org.jobrunr:jobrunr-spring-boot-4-starter:8.5.1'
+    implementation "org.jobrunr:jobrunr-spring-boot-4-starter:${jobrunrVersion}"
+
+    // Spring Boot 4 / Grails 8 no longer pulls jackson-databind transitively for our
+    // surface area; JobRunr's JacksonJsonMapper needs it. Version is BOM-managed.
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 }
 ```
 
